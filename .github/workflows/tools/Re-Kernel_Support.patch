@@ -22,22 +22,34 @@ index 1bec7819a837a..9d044a1bb9de4 100644
 +obj-$(CONFIG_REKERNEL)		+= rekernel/
 diff --git a/drivers/rekernel/Kconfig b/drivers/rekernel/Kconfig
 new file mode 100644
-index 0000000000000..c04ff0bda9cd1
+index 0000000000000..a1b2c3d4e5f6a
 --- /dev/null
 +++ b/drivers/rekernel/Kconfig
-@@ -0,0 +1,5 @@
+@@ -0,0 +1,14 @@
 +config REKERNEL
-+	tristate "Re:Kernel"
++	tristate "Re:Kernel module"
++	depends on MODULES
 +	default n
 +	help
-+	  Support Re:Kernel for better Tombstone functionality.
++	  Make tombstone users get a better experience.
++	  Enabling this will build Re-Kernel as a loadable module.
++
++config REKERNEL_NETWORK
++	bool "Re:Kernel NetReceive unfreeze support"
++	depends on REKERNEL
++	default n
++	help
++	  Allow ReKernel to listen to network activity then send signal to tombstone.
 diff --git a/drivers/rekernel/Makefile b/drivers/rekernel/Makefile
 new file mode 100644
 index 0000000000000..bb613644a5f46
 --- /dev/null
 +++ b/drivers/rekernel/Makefile
-@@ -0,0 +1 @@
+@@ -0,0 +1,4 @@
 +obj-$(CONFIG_REKERNEL) += rekernel.o
++ccflags-$(CONFIG_REKERNEL_NETWORK) += -DNETWORK_FILTER
++ccflags-y += -I$(srctree)/drivers/android
++CFLAGS_rekernel.o += $(CC_FLAGS_CFI)
 diff --git a/drivers/rekernel/rekernel.c b/drivers/rekernel/rekernel.c
 new file mode 100644
 index 0000000000000..a89fba320c81c
@@ -66,7 +78,7 @@ index 0000000000000..a89fba320c81c
 +#include "rekernel.h"
 +#include <trace/hooks/binder.h>
 +#include <trace/hooks/signal.h>
-+#include "../android/binder_internal.h"
++#include "binder_internal.h"
 +#include <linux/string.h>
 +#include <linux/init.h>
 +#include <linux/types.h>

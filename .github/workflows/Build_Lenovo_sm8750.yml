@@ -33,7 +33,7 @@ on:
         description: "⏰ 自定义构建时间 (留空默认官核时间)"
         required: false
         default: ''
-    
+
       enable_bbg:
         description: "开启BBG基带守护"
         required: false
@@ -45,7 +45,7 @@ on:
         required: false
         default: false
         type: boolean
-
+      
       enable_Adios:
         description: "启用ADIOS IO调度器支持"
         required: true
@@ -53,13 +53,13 @@ on:
         type: boolean
 
       enable_kpm:
-        description: "启用 KPM 支持"
+        description: "启用KPM"
         required: false
         default: true
         type: boolean
-
+      
       enable_susfs:
-        description: "启用 SUSFS "
+        description: "启用SUSFS"
         required: true
         default: true
         type: boolean
@@ -86,8 +86,8 @@ jobs:
       ENABLE_ADIOS: ${{ github.event.inputs.enable_Adios }}
       ENABLE_BBG: ${{ github.event.inputs.enable_bbg }}
       ENABLE_KPM: ${{ github.event.inputs.enable_kpm }}
-      ENABLE_SIGNED: ${{ github.event.inputs.enable_signed }}
       ENABLE_SUSFS: ${{ github.event.inputs.enable_susfs }}
+      ENABLE_SIGNED: ${{ github.event.inputs.enable_signed }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -209,79 +209,57 @@ jobs:
         if: ${{ steps.ccache-restore.outputs.cache-matched-key == '' }}
         uses: actions/github-script@v8
         env:
-          PUBLIC_CACHE_REPO: ${{ vars.PUBLIC_CACHE_REPO_LENOVO }}
-          PUBLIC_CACHE_TAG: ${{ vars.PUBLIC_CACHE_TAG_LENOVO }}
-          KERNEL_VERSION_NAME: ${{ env.KERNEL_VERSION }}
+          PUBLIC_CACHE_REPO: ${{ vars.PUBLIC_CACHE_REPO }}
+          PUBLIC_CACHE_TAG: ${{ vars.PUBLIC_CACHE_TAG }}
+          DEVICE_NAME: ${{ env.DEVICES_NAME }}
         with:
           script: |
-            const kernelVersion = process.env.KERNEL_VERSION_NAME;
+            const repoName = process.env.PUBLIC_CACHE_REPO || 'showdo/Public_Ccache';
+            const releaseTag = process.env.PUBLIC_CACHE_TAG || 'exported-ccaches';
+            const [owner, repo] = repoName.split('/');
+            const deviceName = process.env.DEVICE_NAME;
             let selected = null;
 
-            const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const exactAssetName = `ccache-${kernelVersion}.tar.zst`;
-            const legacyAssetPattern = new RegExp(`^ccache-(.+-)?${escapeRegex(kernelVersion)}(-[0-9]+)?\\.tar\\.zst$`);
+            const escape_regex = (value) => value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+            const exactAssetName = `ccache-${deviceName}.tar.zst`;
+            const legacyAssetPattern = new RegExp(`^ccache-(.+-)?${escape_regex(deviceName)}(-[0-9]+)?\\.tar\\.zst$`);
 
-            const unique = (values) => [...new Set(values.filter(Boolean))];
-            const candidateRepos = unique([
-              process.env.PUBLIC_CACHE_REPO,
-              'showdo/Build_Lenovo_sm8750',
-              'showdo/Build_Oneplus_Realme_Action',
-            ]);
-            const candidateTags = unique([
-              process.env.PUBLIC_CACHE_TAG,
-              'Public_Ccache',
-              'Public_Ccache_SM8750',
-            ]);
+            core.info(`当前仓库无匹配 ccache，开始按机型查找公共缓存：${deviceName}`);
+            core.info(`缓存来源仓库：${owner}/${repo}`);
+            core.info(`缓存来源标签：${releaseTag}`);
+            core.info(`优先匹配公共缓存文件：${exactAssetName}`);
 
-            core.info(`当前仓库无匹配 ccache，开始按内核版本查找公共缓存: ${kernelVersion}`);
-            core.info(`优先匹配公共缓存文件: ${exactAssetName}`);
+            let release;
+            try {
+              const response = await github.rest.repos.getReleaseByTag({
+                owner,
+                repo,
+                tag: releaseTag,
+              });
+              release = response.data;
+            } catch (error) {
+              core.info(`未找到公共缓存 release: ${releaseTag}`);
+              return;
+            }
 
-            for (const repoName of candidateRepos) {
-              const [owner, repo] = repoName.split('/');
-              for (const releaseTag of candidateTags) {
-                core.info(`尝试缓存来源: ${owner}/${repo}@${releaseTag}`);
+            for (const asset of release.assets || []) {
+              const isExactMatch = asset.name === exactAssetName;
+              const isLegacyMatch = legacyAssetPattern.test(asset.name);
+              if (isExactMatch || isLegacyMatch) {
+                const shouldReplace =
+                  !selected ||
+                  (isExactMatch && !selected.exact) ||
+                  (isExactMatch === selected.exact && new Date(asset.updated_at) > new Date(selected.updated_at));
 
-                let release;
-                try {
-                  const response = await github.rest.repos.getReleaseByTag({
-                    owner,
-                    repo,
-                    tag: releaseTag,
-                  });
-                  release = response.data;
-                } catch (error) {
-                  core.info(`未找到公共缓存 release: ${owner}/${repo}@${releaseTag}`);
-                  continue;
+                if (shouldReplace) {
+                  selected = {
+                    name: asset.name,
+                    updated_at: asset.updated_at,
+                    tag: release.tag_name,
+                    repo: `${owner}/${repo}`,
+                    exact: isExactMatch,
+                  };
                 }
-
-                for (const asset of release.assets || []) {
-                  const isExactMatch = asset.name === exactAssetName;
-                  const isLegacyMatch = legacyAssetPattern.test(asset.name);
-                  if (isExactMatch || isLegacyMatch) {
-                    const shouldReplace =
-                      !selected ||
-                      (isExactMatch && !selected.exact) ||
-                      (isExactMatch === selected.exact && new Date(asset.updated_at) > new Date(selected.updated_at));
-
-                    if (shouldReplace) {
-                      selected = {
-                        name: asset.name,
-                        updated_at: asset.updated_at,
-                        tag: release.tag_name,
-                        repo: `${owner}/${repo}`,
-                        exact: isExactMatch,
-                      };
-                    }
-                  }
-                }
-
-                if (selected?.exact) {
-                  break;
-                }
-              }
-
-              if (selected?.exact) {
-                break;
               }
             }
 
@@ -290,7 +268,7 @@ jobs:
               return;
             }
 
-            core.info(`找到公共缓存: ${selected.name} (${selected.repo}@${selected.tag})`);
+            core.info(`找到公共缓存：${selected.name} (${selected.repo}@${selected.tag})`);
             core.setOutput('asset-name', selected.name);
             core.setOutput('release-tag', selected.tag);
             core.setOutput('source-repo', selected.repo);
@@ -304,7 +282,7 @@ jobs:
           PUBLIC_CACHE_ASSET: ${{ steps.public-ccache.outputs.asset-name }}
         run: |
           set -euo pipefail
-          echo "当前仓库无匹配缓存，开始下载公共缓存: $PUBLIC_CACHE_ASSET"
+          echo "当前仓库无匹配缓存，开始下载公共缓存：$PUBLIC_CACHE_ASSET"
           rm -f "$PUBLIC_CACHE_ASSET"
           rm -rf "$CCACHE_DIR"
           gh release download "$PUBLIC_CACHE_TAG" --repo "$PUBLIC_CACHE_REPO" --pattern "$PUBLIC_CACHE_ASSET" --dir .
@@ -324,7 +302,7 @@ jobs:
           test -d "$CCACHE_DIR"
           ls -lah "$CCACHE_DIR" | head -n 20
           echo "PUBLIC_CCACHE_USED=true" >> "$GITHUB_ENV"
-          echo "公共缓存恢复完成: $CCACHE_DIR"
+          echo "公共缓存恢复完成：$CCACHE_DIR"
       
       - name: 📥 Init ccache (初始化配置ccache)
         run: |
@@ -363,102 +341,15 @@ jobs:
         if: ${{ env.ENABLE_REKERNEL == 'true' }}
         working-directory: kernel_workspace/common
         run: |
-          echo "开始添加 Re-Kernel 支持..."
-        
           PATCH_FILE="${GITHUB_WORKSPACE}/.github/workflows/tools/Re-Kernel_Support.patch"
-        
-          if [ ! -f "$PATCH_FILE" ]; then
-            echo "::error::未找到 Re-Kernel 补丁文件：$PATCH_FILE"
-            exit 1
-          fi
-          if grep -q "Re-Kernel" init/main.c 2>/dev/null || \
-              grep -q "re_kernel" init/main.c 2>/dev/null; then
-            echo "✓ Re-Kernel 支持已存在，跳过应用补丁"
-          fi
-          cp "$PATCH_FILE" ./Re-Kernel_Support.patch
-            echo "正在应用 Re-Kernel 补丁..."
-            if patch -p1 -N --ignore-whitespace -F 3 < Re-Kernel_Support.patch 2>&1 | tee /tmp/patch.log; then
-              echo "✓ Re-Kernel 补丁应用成功"
-            else
-              echo "::warning::Re-Kernel 补丁应用出现问题，检查日志..."
-              if grep -q "malformed patch" /tmp/patch.log; then
-                echo "::warning::补丁文件格式问题，尝试强制应用..."
-                patch -p1 -N --force --ignore-whitespace < Re-Kernel_Support.patch || true
-                echo "✓ Re-Kernel 补丁已尽力应用，请手动验证"
-              else
-                echo "::warning::Re-Kernel 补丁应用失败"
-                cat /tmp/patch.log
-                exit 1
-              fi
-            fi
-          cd ..
-          echo "CONFIG_REKERNEL=y" >> ./common/arch/arm64/configs/gki_defconfig
+          cp "$PATCH_FILE" ./
+          patch -p1 -N --ignore-whitespace -F 3 < Re-Kernel_Support.patch 2>&1 | tee /tmp/rk.log || true
           rm -f Re-Kernel_Support.patch
-
-      - name: 🔧 Add lz4armv8 Acceleration Support (添加 lz4armv8 硬件加速支持)
-        working-directory: kernel_workspace/common
-        run: |
-          echo "开始添加 LZ4 ARM64 硬件加速支持..."
-          
-          PATCH_FILE="${GITHUB_WORKSPACE}/.github/workflows/tools/lz4armv8_support.patch"
-          
-          # 检查补丁文件是否存在
-          if [ ! -f "$PATCH_FILE" ]; then
-            echo "::error::未找到 LZ4 ARM64 补丁文件：$PATCH_FILE"
-            exit 1
-          fi
-          
-          # 检查是否已经应用过补丁
-          if [ -f "fs/f2fs/lz4armv8/lz4accel.c" ]; then
-            echo "✓ LZ4 ARM64 加速文件已存在，跳过应用补丁"
-          else
-            # 复制补丁文件到工作目录
-            cp "$PATCH_FILE" ./lz4armv8_support.patch
-            
-            # 应用补丁
-            echo "正在应用 LZ4 ARM64 硬件加速补丁..."
-            if patch -p1 --ignore-whitespace -F 3 < lz4armv8_support.patch 2>&1 | tee /tmp/lz4_patch.log; then
-              echo "✓ LZ4 ARM64 补丁应用成功"
-            else
-              echo "::warning::LZ4 ARM64 补丁应用出现问题，检查日志..."
-              if grep -q "malformed patch\|patch failed" /tmp/lz4_patch.log; then
-                echo "::warning::补丁文件格式问题或冲突，尝试强制应用..."
-                patch -p1 --force --ignore-whitespace < lz4armv8_support.patch || true
-                echo "✓ LZ4 ARM64 补丁已尽力应用"
-              else
-                echo "::error::LZ4 ARM64 补丁应用失败"
-                cat /tmp/lz4_patch.log
-                exit 1
-              fi
-            fi
-            
-            # 清理临时补丁文件
-            rm -f lz4armv8_support.patch
-          fi
-          
-          # 添加内核配置
-          echo "正在配置 LZ4 硬件加速相关选项..."
-          
-          # 启用 F2FS 压缩支持（如果未启用）
-          if ! grep -q "CONFIG_F2FS_COMPRESSION=y" arch/arm64/configs/gki_defconfig; then
-            echo "CONFIG_F2FS_COMPRESSION=y" >> arch/arm64/configs/gki_defconfig
-            echo "✓ 已启用 F2FS 压缩支持"
-          else
-            echo "✓ F2FS 压缩支持已启用"
-          fi
-          
-          # 启用 NEON 支持（ARM64 默认已启用，但显式声明）
-          if ! grep -q "CONFIG_KERNEL_MODE_NEON=y" arch/arm64/configs/gki_defconfig; then
-            echo "CONFIG_KERNEL_MODE_NEON=y" >> arch/arm64/configs/gki_defconfig
-            echo "✓ 已启用 NEON 模式支持"
-          else
-            echo "✓ NEON 模式支持已启用"
-          fi
-          
-          echo "✓ LZ4 ARM64 硬件加速支持配置完成"
+          echo "CONFIG_REKERNEL=m" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_REKERNEL_NETWORK=y" >> arch/arm64/configs/gki_defconfig
+          echo "✅ Re-Kernel配置已注入"
 
       - name: 🔧 Add adios_ioscheduler (添加 adios_ioscheduler)
-        if: ${{ env.ENABLE_ADIOS == 'true' }}
         working-directory: kernel_workspace/common
         run: |
           echo "开始添加 ADIOS I/O 调度器支持..."
@@ -727,8 +618,8 @@ jobs:
         if: env.BUILD_TIME > 480
         uses: actions/github-script@v8
         env:
-          PREFIX: ccache-${{ env.KSU_TYPE }}-${{ env.DEVICES_NAME }}
-          CURRENT_KEY: ccache-${{ env.KSU_TYPE }}-${{ env.DEVICES_NAME }}-${{ github.run_id }}
+          PREFIX: ccache-${{ env.KSU_TYPE }}-${{ env.KERNEL_VERSION }}
+          CURRENT_KEY: ccache-${{ env.KSU_TYPE }}-${{ env.KERNEL_VERSION }}-${{ github.run_id }}
         with:
           script: |
             const { owner, repo } = context.repo;
