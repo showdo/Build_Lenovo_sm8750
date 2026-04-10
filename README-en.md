@@ -19,7 +19,7 @@ This project provides an automated kernel compilation workflow based on **GitHub
 - 🚀 **Fully Automated Compilation** - Based on GitHub Actions, no local environment required
 - 🔧 **Multiple KSU Support** - ReSukiSU / SukiSU-Ultra options available
 - 📱 **Multi-Device Compatibility** - Supports Lenovo SM8750 platform devices
-- ⚡ **Performance Optimization** - Integrated perfect Fengchi scheduler patch
+- ⚡ **Performance Optimization** - Integrated ADIOS I/Oscheduler patch
 - 💾 **ccache Caching** - Intelligent cache management, 50% speed boost for first compilation with public cache, 80% for subsequent compilations
 - 📦 **Ready to Use** - Automatically generates AnyKernel3 flashable packages
 
@@ -48,7 +48,6 @@ Click the **Fork** button in the upper right corner of the repository to copy th
 | Workflow | Description | Use Case |
 |----------|-------------|----------|
 | [build.yml](.github/workflows/build.yml) | Full kernel compilation (including KSU/SUSFS, etc.) | Integrate KSU to obtain ROOT |
-| [build_kernel_only.yml](.github/workflows/build_kernel_only.yml) | Official source compilation without Root | Only need official kernel, no KSU integration |
 | [clean-caches.yml](.github/workflows/clean-caches.yml) | Clean ccache cache | When cache is abnormal or recompilation is needed |
 | [clear_workflows.yml](.github/workflows/clear_workflows.yml) | Clear workflow run records | Keep Action interface clean |
 
@@ -61,7 +60,7 @@ Click the **Fork** button in the upper right corner of the repository to copy th
 During workflow execution, you can configure the following parameters:
 
 - **kernel_version**: Select the kernel version to compile
-- **KSU Type**: Choose KernelSU type (ReSukiSU / SukiSU-Ultra / None)
+- **KSU Type**: Choose KernelSU type (ReSukiSU / SukiSU-Ultra)
 - **Enable SUSFS**: Whether to enable SUSFS support
 - **Custom Flags**: Add additional compilation flags
 
@@ -124,12 +123,6 @@ When build time exceeds 8 minutes, old ccache cache will be automatically cleane
 - **Telegram Channel**: [@qdykernel](https://t.me/qdykernel)
 - **CoolApk Profile**: [@qdykernel](http://www.coolapk.com/u/1624571)
 - **GitHub Issues**: [Submit Issue](https://github.com/qdykernel/Build_Lenovo_sm8750/issues)
-
-### Acknowledgments
-
-This project references implementations from the following excellent projects:
-- [OnePlus/Realme SM8750 Kernel Build](https://github.com/qdykernel/Build_Oneplus_Realme_Action)
-- Various open-source kernel compilation tools and script authors
 
 ---
 

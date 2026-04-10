@@ -19,7 +19,7 @@
 - 🚀 **全自动化编译** - 基于 GitHub Actions，无需本地环境
 - 🔧 **多种 KSU 支持** - ReSukiSU / SukiSU-Ultra 可选
 - 📱 **多机型适配** - 支持 Lenovo SM8750 平台设备
-- ⚡ **性能优化** - 集成完美风驰调度补丁
+- ⚡ **性能优化** - 集成ADIOS I/O调度补丁
 - 💾 **ccache 缓存** - 智能缓存管理，首次编译使用公共缓存提速 50%，二次编译提速 80%
 - 📦 **开箱即用** - 自动生成 AnyKernel3 刷入包
 
@@ -48,7 +48,6 @@
 | 工作流 | 说明 | 适用场景 |
 |--------|------|----------|
 | [build.yml](.github/workflows/build.yml) | 完整内核编译（含 KSU/SUSFS 等） | 集成KSU获取ROOT |
-| [build_kernel_only.yml](.github/workflows/build_kernel_only.yml) | 无 Root 官方源码编译 | 仅需官方内核，不集成 KSU |
 | [clean-caches.yml](.github/workflows/clean-caches.yml) | 清理 ccache 缓存 | 缓存异常或需要重新编译时 |
 | [clear_workflows.yml](.github/workflows/clear_workflows.yml) | 清理工作流运行记录 | 保证Action界面整洁
 
@@ -61,7 +60,7 @@
 在工作流运行时，您可以配置以下参数：
 
 - **kernel_version**: 选择要编译的内核版本
-- **KSU Type**: 选择 KernelSU 类型 (ReSukiSU / SukiSU-Ultra / None)
+- **KSU Type**: 选择 KernelSU 类型 (ReSukiSU / SukiSU-Ultra)
 - **Enable SUSFS**: 是否启用 SUSFS 支持
 - **Custom Flags**: 添加额外的编译标志
 
@@ -124,12 +123,6 @@
 - **Telegram 频道**: [@qdykernel](https://t.me/qdykernel)
 - **酷安主页**: [@qdykernel](http://www.coolapk.com/u/1624571)
 - **GitHub Issues**: [提交问题](https://github.com/qdykernel/Build_Lenovo_sm8750/issues)
-
-### 感谢
-
-本项目参考了以下优秀项目的实现：
-- [OnePlus/Realme SM8750 内核构建](https://github.com/qdykernel/Build_Oneplus_Realme_Action)
-- 各类开源内核编译工具和脚本作者
 
 ---
 
