@@ -43,7 +43,7 @@ on:
       enable_ReKernel:
         description: "启用Re-Kernel支持"
         required: false
-        default: false
+        default: true
         type: boolean
       
       enable_Adios:
@@ -339,15 +339,27 @@ jobs:
 
       - name: 🔧 Add Re-Kernel Support (添加 Re-Kernel 支持)
         if: ${{ env.ENABLE_REKERNEL == 'true' }}
-        working-directory: kernel_workspace/common
         run: |
-          PATCH_FILE="${GITHUB_WORKSPACE}/.github/workflows/tools/Re-Kernel_Support.patch"
-          cp "$PATCH_FILE" ./
-          patch -p1 -N --ignore-whitespace -F 3 < Re-Kernel_Support.patch 2>&1 | tee /tmp/rk.log || true
-          rm -f Re-Kernel_Support.patch
-          echo "CONFIG_REKERNEL=m" >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_REKERNEL_NETWORK=y" >> arch/arm64/configs/gki_defconfig
-          echo "✅ Re-Kernel配置已注入"
+          cd kernel_workspace
+          VERSION=$(awk -F'=' '/^VERSION[ \t]*=/ {gsub(/ /,"",$2); print $2}' common/Makefile)
+          PATCHLEVEL=$(awk -F'=' '/^PATCHLEVEL[ \t]*=/ {gsub(/ /,"",$2); print $2}' common/Makefile)
+          echo "VERSION=$VERSION"
+          echo "PATCHLEVEL=$PATCHLEVEL"
+          git clone https://github.com/Sakion-Team/Re-Kernel.git
+          RE_DIR="${GITHUB_WORKSPACE}/kernel_workspace/Re-Kernel/LKM-Source"
+          cd common
+          sed -i '/endmenu/i source "drivers/rekernel/Kconfig"' drivers/Kconfig
+          sed -i '$a \#Re-Kernel Support\nobj-$(CONFIG_REKERNEL) += rekernel/' drivers/Makefile
+          mkdir -p drivers/rekernel
+          cp ${RE_DIR}/* drivers/rekernel/
+          TARGET="KERNEL_${VERSION}_${PATCHLEVEL}"
+          if grep -q "$TARGET" drivers/rekernel/rekernel.h; then
+            sed -i "s|^[[:space:]]*//[[:space:]]*#define[[:space:]]\+$TARGET|#define $TARGET|" drivers/rekernel/rekernel.h
+            echo "CONFIG_REKERNEL=m" >> arch/arm64/configs/gki_defconfig
+            echo "CONFIG_REKERNEL_NETWORK=y" >> arch/arm64/configs/gki_defconfig
+          else
+            echo "⚠️ $TARGET not found in rekernel.h"
+          fi
 
       - name: 🔧 Add adios_ioscheduler (添加 adios_ioscheduler)
         working-directory: kernel_workspace/common
