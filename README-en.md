@@ -18,7 +18,6 @@ This project provides an automated kernel compilation workflow based on **GitHub
 
 - 🚀 **Fully Automated Compilation** - Based on GitHub Actions, no local environment required
 - 🔧 **Multiple KSU Support** - ReSukiSU / SukiSU-Ultra options available
-- 📱 **Multi-Device Compatibility** - Supports Lenovo SM8750 platform devices
 - ⚡ **Performance Optimization** - Integrated ADIOS I/Oscheduler patch
 - 💾 **ccache Caching** - Intelligent cache management, 50% speed boost for first compilation with public cache, 80% for subsequent compilations
 - 📦 **Ready to Use** - Automatically generates AnyKernel3 flashable packages
